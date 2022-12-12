@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+NAME="Chatchai Jantaraprim"
+EMAIL="cj@cjv6.net"
+
+[ -d ".gnupg" ] && echo "Directory .gnupg exist" && exit
+
+mkdir -m 0700 .gnupg
+touch .gnupg/gpg.conf
+chmod 600 .gnupg/gpg.conf
+cat <<EOT > .gnupg/gpg.conf
+personal-cipher-preferences AES256 AES192 AES
+personal-digest-preferences SHA512 SHA384 SHA256
+personal-compress-preferences ZLIB BZIP2 ZIP Uncompressed
+default-preference-list SHA512 SHA384 SHA256 AES256 AES192 AES ZLIB BZIP2 ZIP Uncompressed
+cert-digest-algo SHA512
+s2k-digest-algo SHA512
+s2k-cipher-algo AES256
+charset utf-8
+fixed-list-mode
+no-comments
+no-emit-version
+no-greeting
+keyid-format 0xlong
+list-options show-uid-validity
+verify-options show-uid-validity
+with-fingerprint
+with-key-origin
+require-cross-certification
+#no-symkey-cache
+use-agent
+throw-keyids
+keyserver hkps://keys.openpgp.org
+EOT
+
+cd .gnupg
+gpg --list-keys
+
+cat >keydetails <<EOF
+    %echo Generating a basic OpenPGP key
+    Key-Type: RSA
+    Key-Length: 4096
+    Subkey-Type: RSA
+    Subkey-Length: 4096
+    Name-Real: ${NAME}
+    Name-Email: ${EMAIL}
+    Expire-Date: 0
+    %no-ask-passphrase
+    %no-protection
+    %pubring pubring.kbx
+    %secring trustdb.gpg
+    %commit
+    %echo done
+EOF
+
+gpg --verbose --batch --gen-key keydetails
+
+# Set trust to 5 for the key so we can encrypt without prompt.
+/usr/bin/echo -e "5\ny\n" |  gpg --command-fd 0 --expert --edit-key ${EMAIL} trust;
+
+FINGERPRINT=$(gpg --list-secret-keys --fingerprint | grep fingerprint | tail -1 | cut -f2 -d= | sed -e 's/ //g')
+echo "${FINGERPRINT}" > ../.gpg-fingerprint
+
+# ### verify that we can use key to encrypt and decrypt file ###
+# gpg -e -a -r ${EMAIL} keydetails
+# rm keydetails
+# gpg -d keydetails.asc
+# rm keydetails.asc
